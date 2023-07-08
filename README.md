@@ -39,10 +39,25 @@ Listening...
 ```
 
 ### (Optional) Install the script as a UNIX service 
-```
+Run this on the Terminal: 
+```bash
 chmod +x install_service.sh
 ./install_service.sh
 ```
+To remove the service,
+```bash
+chmod +x remove_service.sh
+./remove_service.sh
+```
+To check if the service is running,
+```bash
+# On Debian
+sudo service status autorecord
+# On Ubuntu
+```
+
+### View Logs
+The output of the script is available at @TODO
 
 ## Usage
 
