@@ -1,28 +1,36 @@
 import struct
 import unittest
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, MagicMock
 import os
 from record import OUTPUT_DIRECTORY, Recorder
 
 
 class TestRecorder(unittest.TestCase):
-    @patch("pyaudio.PyAudio")
-    def setUp(self, p, listen_mock):
-        self.recorder = Recorder()
-        self.recorder.p = p
-        self.stream_mock = Mock()
-        self.recorder.stream = self.stream_mock
-        self.recorder.p.get_sample_size.return_value = 2
-        # Assume the method that should return int is named get_int
-        # This will return 1 whenever get_int is called
-        self.recorder.p.get_int.return_value = 1
+    @patch("wave.open", autospec=True)
+    def setUp(self, wave_open_mock):
+        mock_p = MagicMock()
+        mock_p.get_device_info_by_host_api_device_index = Mock()
+        mock_p.get_device_info_by_host_api_device_index().get.return_value = 1
+        mock_p.get_host_api_info_by_index = Mock()
+        mock_p.get_host_api_info_by_index().get.return_value = 1
+        mock_p.get_sample_size().return_value = 1
+        mock_p
+
+        with patch("pyaudio.PyAudio", return_value=mock_p):
+            self.recorder = Recorder()
+            self.recorder.p = mock_p
+            # self.recorder.p = p
+            self.stream_mock = Mock()
+            self.recorder.record = Mock()
+            self.recorder.stream = self.stream_mock
+           
 
     def test_rms(self):
         frame = struct.pack("h", 10) * 2
         output = self.recorder.rms(frame)
         expected_output = 0.2214
         self.assertAlmostEqual(output, expected_output, places=4)
-
+    
     def test_write(self):
         os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
         self.recorder.write(b"")

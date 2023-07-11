@@ -8,6 +8,7 @@ import os
 import wave
 import alive_progress
 import subprocess
+from unittest.mock import patch
 
 # Loading configuration values from config.yml file
 with open("config.yml") as f:
@@ -30,41 +31,49 @@ print("MAX_SILENCE_LENGTH: ", MAX_SILENCE_LENGTH)
 print("SILENCE_THRESHOLD: ", SILENCE_THRESHOLD)
 print("OUTPUT_DIRECTORY: ", OUTPUT_DIRECTORY)
 
-
+# Another constant
 FORMAT = pyaudio.paInt16
 
 
 class Recorder:
     @staticmethod
     def rms(frame):
-        count = len(frame) / 2
-        format = "%dh" % (count)
-        shorts = struct.unpack(format, frame)
+        """Calculates and returns the root mean square of a frame."""
+        count = len(frame) // 2
+        shorts = struct.unpack("%dh" % (count), frame)
 
-        sum_squares = 0.0
-        for sample in shorts:
-            n = sample * NORMALIZATION_FACTOR
-            sum_squares += n * n
-
-        rms = math.pow(sum_squares / count, 0.5)
-        return rms * 1000
+        sum_squares = sum((sample * NORMALIZATION_FACTOR) ** 2 for sample in shorts)
+        return math.sqrt(sum_squares / count) * 1000
 
     def __init__(self) -> None:
+        """Initialize the Recorder class by choosing an audio device and setting up an audio stream."""
+
+        # Set up PyAudio
         self.p = pyaudio.PyAudio()
         info = self.p.get_host_api_info_by_index(0)
         numdevices = info.get("deviceCount")
+        print(
+            self.p.get_device_info_by_host_api_device_index(0, 0).get(
+                "maxInputChannels"
+            )
+        )
+
+        # Loop through all devices, print the info of devices with input capability
         for i in range(0, numdevices):
             if (
                 self.p.get_device_info_by_host_api_device_index(0, i).get(
                     "maxInputChannels"
                 )
-            ) > 0:
+                > 0
+            ):
                 print(
                     "Input Device id ",
                     i,
                     " - ",
                     self.p.get_device_info_by_host_api_device_index(0, i).get("name"),
                 )
+
+        # Ask the user to pick a device if there is more than one, otherwise, pick the only device available
         device_index = (
             int(input("Select device id: ")) if numdevices > 1 else numdevices
         )
@@ -79,7 +88,7 @@ class Recorder:
             frames_per_buffer=BUFFER_SIZE,
         )
 
-    def record(self, bar):
+    def run_recording(self, bar):
         print("Noise detected, recording beginning")
         rec = []
         current = time.time()
@@ -87,12 +96,11 @@ class Recorder:
 
         while current <= end:
             data = self.stream.read(BUFFER_SIZE, exception_on_overflow=False)
-            rms_val = self.rms(data)
-            bar(rms_val / 24.0)
-            bar.title("Recording")
+            rms_val = self.update_progress(bar, data, "Recording")
 
             if rms_val >= SILENCE_THRESHOLD:
                 end = time.time() + MAX_SILENCE_LENGTH
+
             current = time.time()
             rec.append(data)
 
@@ -117,15 +125,19 @@ class Recorder:
         wf.writeframes(recording)
         wf.close()
         print("Written to file: {}".format(filename))
+        self.copy_to_gdrive()
+        print("Returning to listening")
+
+    def copy_to_gdrive(self):
         result = subprocess.run(
             ["rclone", "move", "/home/pranjal/autorecord/output", "gdrive:/"],
             capture_output=True,
             text=True,
         )
         print("Copied. ", result.stdout)
-        print("Returning to listening")
 
     def listen(self):
+        """Continuously listens to the audio stream and starts recording when sound level gets above a certain threshold."""
         print("Listening beginning")
         with alive_progress.alive_bar(
             24,
@@ -138,11 +150,15 @@ class Recorder:
         ) as bar:
             while True:
                 input = self.stream.read(BUFFER_SIZE, exception_on_overflow=False)
-                rms_val = self.rms(input)
-                bar(rms_val / 24.0)
-                bar.title("Listening")
+                rms_val = self.update_progress(bar, input, "Listening")
                 if rms_val > SILENCE_THRESHOLD:
-                    self.record(bar)
+                    self.run_recording(bar)
+
+    def update_progress(self, bar, input, title):
+        rms_val = self.rms(input)
+        bar(rms_val / 24.0)
+        bar.title(title)
+        return rms_val
 
     def listen_buffer(self, bar):
         rec_buffer = []
@@ -156,6 +172,18 @@ class Recorder:
             bar(rms_val / 24.0)
             if rms_val >= SILENCE_THRESHOLD:
                 end = time.time() + MAX_SILENCE_LENGTH
+
+
+def test_recorder_write():
+    rec = Recorder()
+    with patch.object(rec, "write", return_value=None) as mock_method:
+        rec.write(b"")
+        mock_method.assert_called_once()
+
+
+def test_recorder_run_recording():
+    rec = Recorder()
+    rec.run
 
 
 if __name__ == "__main__":
