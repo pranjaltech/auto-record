@@ -65,7 +65,9 @@ class Recorder:
                     " - ",
                     self.p.get_device_info_by_host_api_device_index(0, i).get("name"),
                 )
-        device_index = int(input("Select device id: "))
+        device_index = (
+            int(input("Select device id: ")) if numdevices > 1 else numdevices
+        )
         self.record_armed = False
         self.stream = self.p.open(
             format=FORMAT,
@@ -156,5 +158,6 @@ class Recorder:
                 end = time.time() + MAX_SILENCE_LENGTH
 
 
-a = Recorder()
-a.listen()
+if __name__ == "__main__":
+    a = Recorder()
+    a.listen()
