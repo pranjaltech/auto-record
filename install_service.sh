@@ -7,3 +7,4 @@ if [[ $REPLY =~ ^[Yy]$ ]]
 then
 	sudo systemctl start $1
 	sudo systemctl enable $1
+fi
