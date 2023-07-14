@@ -6,7 +6,7 @@ Restart=always
 RestartSec=30
 User=pranjal
 WorkingDirectory=/home/pranjal/auto-record
-ExecStart=/usr/bin/python3 record.py
+ExecStart=/usr/bin/python3 record.py --device-id 1
 
 [Install]
 WantedBy=multi-user.target
