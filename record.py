@@ -153,7 +153,7 @@ class Recorder:
 
     def copy_to_gdrive(self):
         result = subprocess.run(
-            ["rclone", "move", "/home/pranjal/autorecord/output", "gdrive:/"],
+            ["rclone", "move", OUTPUT_DIRECTORY, "gdrive:/"],
             capture_output=True,
             text=True,
         )
