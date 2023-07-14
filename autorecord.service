@@ -1,0 +1,12 @@
+[Unit]
+Description=AutoRecord
+
+[Service]
+Restart=always
+RestartSec=30
+User=pranjal
+WorkingDirectory=/home/pranjal/auto-record
+ExecStart=/usr/bin/python3 record.py
+
+[Install]
+WantedBy=multi-user.target
