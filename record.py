@@ -1,3 +1,4 @@
+import argparse
 import yaml
 from datetime import datetime
 import math
@@ -9,6 +10,8 @@ import wave
 import alive_progress
 import subprocess
 from unittest.mock import patch
+
+from classify import classify, prepare_model
 
 # Loading configuration values from config.yml file
 with open("config.yml") as f:
@@ -45,7 +48,7 @@ class Recorder:
         sum_squares = sum((sample * NORMALIZATION_FACTOR) ** 2 for sample in shorts)
         return math.sqrt(sum_squares / count) * 1000
 
-    def __init__(self) -> None:
+    def __init__(self, input_device_id=None) -> None:
         """Initialize the Recorder class by choosing an audio device and setting up an audio stream."""
 
         # Set up PyAudio
@@ -75,7 +78,9 @@ class Recorder:
 
         # Ask the user to pick a device if there is more than one, otherwise, pick the only device available
         device_index = (
-            int(input("Select device id: ")) if numdevices > 1 else numdevices
+            input_device_id
+            if input_device_id != None
+            else (int(input("Select device id: ")) if numdevices > 1 else numdevices)
         )
         self.record_armed = False
         self.stream = self.p.open(
@@ -87,6 +92,11 @@ class Recorder:
             output=True,
             frames_per_buffer=BUFFER_SIZE,
         )
+
+        # Prepare the Classifier
+        model, class_names = prepare_model()
+        self.model = model
+        self.class_names = class_names
 
     def run_recording(self, bar):
         print("Noise detected, recording beginning")
@@ -125,6 +135,19 @@ class Recorder:
         wf.writeframes(recording)
         wf.close()
         print("Written to file: {}".format(filename))
+
+        # Run the classifier on the file
+        inferred_class, _ = classify(self.model, filename, self.class_names)
+
+        print("Inferred class: ", inferred_class)
+        # Move the file to a sub-folder named after the inferred class
+        new_filename = os.path.join(
+            OUTPUT_DIRECTORY, inferred_class, os.path.basename(filename)
+        )
+        os.makedirs(os.path.dirname(new_filename), exist_ok=True)
+        os.rename(filename, new_filename)
+        print("Moved to: {}".format(new_filename))
+
         self.copy_to_gdrive()
         print("Returning to listening")
 
@@ -187,5 +210,16 @@ def test_recorder_run_recording():
 
 
 if __name__ == "__main__":
-    a = Recorder()
+    # See if --device-id was passed as an argument using argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--device-id",
+        help="The device id of the audio device to use. If not specified, the default device will be used.",
+    )
+    args = parser.parse_args()
+
+    # If --device-id was passed, use that device, otherwise, use the default device
+    device_id = int(args.device_id) if args.device_id else None
+
+    a = Recorder(input_device_id=device_id)
     a.listen()

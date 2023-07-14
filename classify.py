@@ -15,12 +15,12 @@ from scipy.io import wavfile
 
 
 def load_file_list(input_dir):
-    music_files = []
+    input_files = []
     for root, dirs, files in os.walk(input_dir):
         for file in files:
             if file.endswith(".wav"):
-                music_files.append(os.path.join(root, file))
-    return music_files
+                input_files.append(os.path.join(root, file))
+    return input_files
 
 
 # Find the name of the class with the top score when mean-aggregated across frames.
@@ -80,13 +80,7 @@ def classify(model, file, class_names):
     return inferred_class, top_classes
 
 
-def run_classification(input_dir, output_file):
-    # Load all the music files in the input directory.
-    music_files = load_file_list(input_dir)
-
-    # Configure a progress bar
-    progress_bar = alive_bar(len(music_files), title="Classifying...")
-
+def prepare_model():
     # Load the trained model.
     model = hub.load("https://tfhub.dev/google/yamnet/1")
 
@@ -94,12 +88,21 @@ def run_classification(input_dir, output_file):
     class_map_path = model.class_map_path().numpy()
     class_names = class_names_from_csv(class_map_path)
 
+    return model, class_names
+
+
+def run_classification(input_files, output_file):
+    # Configure a progress bar
+    progress_bar = alive_bar(len(input_files), title="Classifying...")
+
+    model, class_names = prepare_model()
+
     # Save the classification result, that can be saved to a CSV later.
     # The first column is the file name, and the second column is the classification result, third column is top classes.
     classification_result = []
 
-    with alive_bar(len(music_files), title="Classifying...") as progress_bar:
-        for _file in music_files:
+    with alive_bar(len(input_files), title="Classifying...") as progress_bar:
+        for _file in input_files:
             try:
                 # Save the classification result
                 inferred_class, top_classes = classify(model, _file, class_names)
@@ -132,4 +135,5 @@ if __name__ == "__main__":
     input_dir = args.input_dir
     output_file = args.output_file
 
-    run_classification(input_dir, output_file)
+    input_files = load_file_list(input_dir)
+    run_classification(input_files, output_file)
