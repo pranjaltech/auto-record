@@ -94,7 +94,7 @@ class Recorder:
         )
 
         # Prepare the Classifier
-        model, class_names = prepare_model()
+        model, class_names = prepare_model(True)
         self.model = model
         self.class_names = class_names
 
@@ -137,7 +137,9 @@ class Recorder:
         print("Written to file: {}".format(filename))
 
         # Run the classifier on the file
-        inferred_class, _ = classify(self.model, filename, self.class_names)
+        inferred_class, _ = classify(
+            self.model, filename, self.class_names, True
+        )  # Use TfLite model
 
         print("Inferred class: ", inferred_class)
         # Move the file to a sub-folder named after the inferred class
@@ -152,6 +154,7 @@ class Recorder:
         print("Returning to listening")
 
     def copy_to_gdrive(self):
+        print("Copying to gdrive...")
         result = subprocess.run(
             ["rclone", "move", OUTPUT_DIRECTORY, "gdrive:/"],
             capture_output=True,
