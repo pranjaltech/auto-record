@@ -128,9 +128,7 @@ class Recorder:
 
     def write_async(self, recording):
         self.task_counter.value += 1
-        # self.pool.apply_async(self._write, (recording,), callback=self._write_complete)
-        self._write(recording)
-        self._write_complete(None)
+        self.pool.apply_async(self._write, (recording,), callback=self._write_complete)
 
     def _write_complete(self, result):
         self.task_counter.value -= 1
