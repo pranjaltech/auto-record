@@ -32,10 +32,9 @@ def class_names_from_csv(class_map_csv_text):
     return class_names
 
 
-def ensure_sample_rate(original_sample_rate, waveform, desired_sample_rate=16000):
-    """Resample waveform and ensure fixed length."""
-    desired_length = 15600  # YAMNet expected length
-
+def ensure_sample_rate(
+    original_sample_rate, waveform, desired_sample_rate=16000, use_tflite=False
+):
     # If sample rate is not the desired one, resample
     if original_sample_rate != desired_sample_rate:
         resample_length = int(
@@ -43,17 +42,20 @@ def ensure_sample_rate(original_sample_rate, waveform, desired_sample_rate=16000
         )
         waveform = signal.resample(waveform, resample_length)
 
-    length = len(waveform)
+    if use_tflite:
+        """Resample waveform and ensure fixed length."""
+        desired_length = 15600  # YAMNet expected length
 
-    # If longer, pick center part
-    if length > desired_length:
-        offset = (length - desired_length) // 2
-        waveform = waveform[offset : offset + desired_length]
-    # If shorter, pad with zeros
-    elif length < desired_length:
-        offset = (desired_length - length) // 2
-        padding = np.zeros(desired_length - length)
-        waveform = np.concatenate((padding, waveform, padding))
+        length = len(waveform)
+        # If longer, pick center part
+        if length > desired_length:
+            offset = (length - desired_length) // 2
+            waveform = waveform[offset : offset + desired_length]
+        # If shorter, pad with zeros
+        elif length < desired_length:
+            offset = (desired_length - length) // 2
+            padding = np.zeros(desired_length - length)
+            waveform = np.concatenate((padding, waveform, padding))
 
     return desired_sample_rate, waveform
 
@@ -98,11 +100,11 @@ def prepare_model(use_tflite=False):
 
 
 def classify(model, file, class_names, use_tflite=False):
-    print("Using TFLite model:", use_tflite)
-
     # Read the file
     sample_rate, wav_data = wavfile.read(file, "rb")
-    sample_rate, wav_data = ensure_sample_rate(sample_rate, wav_data)
+    sample_rate, wav_data = ensure_sample_rate(
+        sample_rate, wav_data, use_tflite=use_tflite
+    )
 
     # Convert wav_data to mono format.
     if len(wav_data.shape) == 2:
