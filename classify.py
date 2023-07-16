@@ -68,8 +68,8 @@ def ensure_sample_rate_old(original_sample_rate, waveform, desired_sample_rate=1
     return desired_sample_rate, waveform
 
 
-def prepare_model(tflite=False):
-    if tflite:
+def prepare_model(use_tflite=False):
+    if use_tflite:
         # Check if the model exists in the current directory
         # if not, download it
         if not os.path.exists("yamnet.tflite"):
@@ -82,21 +82,21 @@ def prepare_model(tflite=False):
         model = tf.lite.Interpreter(model_path="yamnet.tflite")
         model.allocate_tensors()
 
-        # Create a csv file to store the classification result.
+        # Load the class map (convert class index to class name)
         class_map_path = zipfile.ZipFile("yamnet.tflite").open("yamnet_label_list.txt")
         class_names = [l.decode("utf-8").strip() for l in class_map_path.readlines()]
     else:
         # Load the trained model.
         model = hub.load("https://tfhub.dev/google/yamnet/1")
 
-        # Create a csv file to store the classification result.
+        # Load the class map (convert class index to class name)
         class_map_path = model.class_map_path().numpy()
         class_names = class_names_from_csv(class_map_path)
 
     return model, class_names
 
 
-def classify(model, file, class_names, tflite=False):
+def classify(model, file, class_names, use_tflite=False):
     # Read the file
     sample_rate, wav_data = wavfile.read(file, "rb")
     sample_rate, wav_data = ensure_sample_rate(sample_rate, wav_data)
@@ -108,7 +108,7 @@ def classify(model, file, class_names, tflite=False):
     # Normalise the waveform
     waveform = wav_data / tf.int16.max
 
-    if tflite:
+    if use_tflite:
         # Convert the waveform to a 32-bit float
         waveform = waveform.astype(np.float32)
 
@@ -122,13 +122,7 @@ def classify(model, file, class_names, tflite=False):
         model.set_tensor(input_details[0]["index"], waveform)
         model.invoke()
         scores = model.get_tensor(output_details[0]["index"])
-        # embeddings = model.get_tensor(output_details[1]["index"])
-        # spectrogram = model.get_tensor(output_details[2]["index"])
-
         scores = tf.convert_to_tensor(scores)
-        # embeddings = tf.convert_to_tensor(embeddings)
-        # spectrogram = tf.convert_to_tensor(spectrogram)
-
     else:
         # Run the model, check the output.
         scores, _, _ = model(waveform)
@@ -139,7 +133,6 @@ def classify(model, file, class_names, tflite=False):
     top_classes = [class_names[index] for index in top_class_indices]
 
     scores_np = scores.numpy()
-    # spectrogram_np = spectrogram.numpy()
     inferred_class = class_names[scores_np.mean(axis=0).argmax()]
 
     return inferred_class, top_classes

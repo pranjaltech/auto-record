@@ -48,7 +48,7 @@ class Recorder:
         sum_squares = sum((sample * NORMALIZATION_FACTOR) ** 2 for sample in shorts)
         return math.sqrt(sum_squares / count) * 1000
 
-    def __init__(self, input_device_id=None) -> None:
+    def __init__(self, input_device_id=None, use_tflite=False) -> None:
         """Initialize the Recorder class by choosing an audio device and setting up an audio stream."""
 
         # Set up PyAudio
@@ -94,7 +94,7 @@ class Recorder:
         )
 
         # Prepare the Classifier
-        model, class_names = prepare_model(True)
+        model, class_names = prepare_model(use_tflite=use_tflite)
         self.model = model
         self.class_names = class_names
 
@@ -219,10 +219,15 @@ if __name__ == "__main__":
         "--device-id",
         help="The device id of the audio device to use. If not specified, the default device will be used.",
     )
+    parser.add_argument(
+        "--tflite",
+        help="Use the TFLite model instead of the Keras model.",
+    )
     args = parser.parse_args()
 
     # If --device-id was passed, use that device, otherwise, use the default device
     device_id = int(args.device_id) if args.device_id else None
+    use_tflite = True if args.tflite else False
 
-    a = Recorder(input_device_id=device_id)
+    a = Recorder(input_device_id=device_id, use_tflite=use_tflite)
     a.listen()
