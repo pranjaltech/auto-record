@@ -6,7 +6,9 @@ Restart=always
 RestartSec=30
 User=pranjal
 WorkingDirectory=/home/pranjal/auto-record
-ExecStart=/usr/bin/python3 record.py --device-id 1
+ExecStart=/usr/bin/python3 record.py --device-id 1 >> /var/log/autorecord.log 2>&1
+StandardOutput=journal+console
+StandardError=journal+console
 
 [Install]
 WantedBy=multi-user.target
