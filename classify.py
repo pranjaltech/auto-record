@@ -69,6 +69,7 @@ def ensure_sample_rate_old(original_sample_rate, waveform, desired_sample_rate=1
 
 
 def prepare_model(use_tflite=False):
+    print("Using TFLite model:", use_tflite)
     if use_tflite:
         # Check if the model exists in the current directory
         # if not, download it
@@ -97,6 +98,8 @@ def prepare_model(use_tflite=False):
 
 
 def classify(model, file, class_names, use_tflite=False):
+    print("Using TFLite model:", use_tflite)
+
     # Read the file
     sample_rate, wav_data = wavfile.read(file, "rb")
     sample_rate, wav_data = ensure_sample_rate(sample_rate, wav_data)

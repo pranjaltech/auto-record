@@ -1,4 +1,5 @@
 import argparse
+import atexit
 import yaml
 from datetime import datetime
 import math
@@ -10,6 +11,9 @@ import wave
 import alive_progress
 import subprocess
 from unittest.mock import patch
+import multiprocessing
+from multiprocessing.pool import ThreadPool
+import pdb
 
 from classify import classify, prepare_model
 
@@ -94,9 +98,15 @@ class Recorder:
         )
 
         # Prepare the Classifier
-        model, class_names = prepare_model(use_tflite=use_tflite)
+        self.use_tflite = use_tflite
+        model, class_names = prepare_model(use_tflite=self.use_tflite)
         self.model = model
         self.class_names = class_names
+
+        # Prepare for multi-processing, since we don't want to block recording while recorded clips are being classified and uploaded
+        self.pool = ThreadPool(processes=2)
+        manager = multiprocessing.Manager()
+        self.task_counter = manager.Value("i", 0)
 
     def run_recording(self, bar):
         print("Noise detected, recording beginning")
@@ -114,9 +124,27 @@ class Recorder:
             current = time.time()
             rec.append(data)
 
-        self.write(b"".join(rec))
+        self.write_async(b"".join(rec))
 
-    def write(self, recording):
+    def write_async(self, recording):
+        self.task_counter.value += 1
+        # self.pool.apply_async(self._write, (recording,), callback=self._write_complete)
+        self._write(recording)
+        self._write_complete(None)
+
+    def _write_complete(self, result):
+        self.task_counter.value -= 1
+
+    def get_current_task_count(self):
+        return self.task_counter.value
+
+    def close_pool(self):
+        self.pool.close()
+        self.pool.join()
+
+    def _write(self, recording):
+        print("Writing to file...")
+
         # Create OUTPUT_DIRECTORY if it doesn't exist
         if not os.path.exists(OUTPUT_DIRECTORY):
             os.makedirs(OUTPUT_DIRECTORY)
@@ -136,9 +164,10 @@ class Recorder:
         wf.close()
         print("Written to file: {}".format(filename))
 
+        print("Classifying...")
         # Run the classifier on the file
         inferred_class, _ = classify(
-            self.model, filename, self.class_names, True
+            self.model, filename, self.class_names, self.use_tflite
         )  # Use TfLite model
 
         print("Inferred class: ", inferred_class)
@@ -150,17 +179,23 @@ class Recorder:
         os.rename(filename, new_filename)
         print("Moved to: {}".format(new_filename))
 
-        self.copy_to_gdrive()
-        print("Returning to listening")
+        self.copy_to_gdrive(filename=new_filename)
+        print("Writing done.")
 
-    def copy_to_gdrive(self):
-        print("Copying to gdrive...")
+    def copy_to_gdrive(self, filename):
+        print("Moving to gdrive...", filename)
+
+        # Create the full path of filename
+        file_path = os.path.abspath(filename)
+        print("File Path: ", file_path)
+
         result = subprocess.run(
-            ["rclone", "move", OUTPUT_DIRECTORY, "gdrive:/"],
+            ["rclone", "move", file_path, "gdrive:/"],
             capture_output=True,
             text=True,
+            check=True,
         )
-        print("Copied. ", result.stdout)
+        print("Saved to Google Drive. ", result.stdout)
 
     def listen(self):
         """Continuously listens to the audio stream and starts recording when sound level gets above a certain threshold."""
@@ -183,7 +218,7 @@ class Recorder:
     def update_progress(self, bar, input, title):
         rms_val = self.rms(input)
         bar(rms_val / 24.0)
-        bar.title(title)
+        bar.title = "{} ({})".format(title, self.get_current_task_count())
         return rms_val
 
     def listen_buffer(self, bar):
@@ -228,6 +263,14 @@ if __name__ == "__main__":
     # If --device-id was passed, use that device, otherwise, use the default device
     device_id = int(args.device_id) if args.device_id else None
     use_tflite = True if args.tflite else False
+    print("USE TF_LITE: ", args.tflite)
 
     a = Recorder(input_device_id=device_id, use_tflite=use_tflite)
-    a.listen()
+
+    # Close the thread pool when the program exits
+    try:
+        atexit.register(a.close_pool)
+        a.listen()
+    except KeyboardInterrupt:
+        a.close_pool()
+        print("Exiting")
