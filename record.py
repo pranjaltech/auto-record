@@ -179,18 +179,19 @@ class Recorder:
         os.rename(filename, new_filename)
         print("Moved to: {}".format(new_filename))
 
-        self.copy_to_gdrive(filename=new_filename)
+        self.copy_to_gdrive(filename=new_filename, inferred_class=inferred_class)
         print("Writing done.")
 
-    def copy_to_gdrive(self, filename):
+    def copy_to_gdrive(self, filename, inferred_class):
         print("Moving to gdrive...", filename)
 
         # Create the full path of filename
         file_path = os.path.abspath(filename)
         print("File Path: ", file_path)
+        target_path = os.path.join("gdrive:/", inferred_class)
 
         result = subprocess.run(
-            ["rclone", "move", file_path, "gdrive:/"],
+            ["rclone", "move", file_path, target_path],
             capture_output=True,
             text=True,
             check=True,
