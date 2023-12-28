@@ -97,11 +97,11 @@ class Recorder:
             frames_per_buffer=BUFFER_SIZE,
         )
 
-        # Prepare the Classifier
-        self.use_tflite = use_tflite
-        model, class_names = prepare_model(use_tflite=self.use_tflite)
-        self.model = model
-        self.class_names = class_names
+        # # Prepare the Classifier
+        # self.use_tflite = use_tflite
+        # model, class_names = prepare_model(use_tflite=self.use_tflite)
+        # self.model = model
+        # self.class_names = class_names
 
         # Prepare for multi-processing, since we don't want to block recording while recorded clips are being classified and uploaded
         self.pool = ThreadPool(processes=2)
@@ -163,10 +163,12 @@ class Recorder:
         print("Written to file: {}".format(filename))
 
         print("Classifying...")
-        # Run the classifier on the file
-        inferred_class, _ = classify(
-            self.model, filename, self.class_names, self.use_tflite
-        )  # Use TfLite model
+        # # Run the classifier on the file
+        # inferred_class, _ = classify(
+        #     self.model, filename, self.class_names, self.use_tflite
+        # )  # Use TfLite model
+
+        inferred_class = "_default"
 
         print("Inferred class: ", inferred_class)
         # Move the file to a sub-folder named after the inferred class
