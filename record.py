@@ -143,6 +143,11 @@ class Recorder:
     def _write(self, recording):
         print("Writing to file...")
 
+        # If duration is less than 6 seconds, discard the clip
+        if len(recording) < SAMPLE_RATE * 6:
+            print("Recording too short, discarding...")
+            return
+
         # Create OUTPUT_DIRECTORY if it doesn't exist
         if not os.path.exists(OUTPUT_DIRECTORY):
             os.makedirs(OUTPUT_DIRECTORY)
