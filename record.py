@@ -15,8 +15,6 @@ import multiprocessing
 from multiprocessing.pool import ThreadPool
 import pdb
 
-from classify import classify, prepare_model
-
 # Loading configuration values from config.yml file
 with open("config.yml") as f:
     config = yaml.safe_load(f)
